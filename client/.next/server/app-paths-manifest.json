@@ -1,0 +1,7 @@
+{
+  "/profile/page": "app/profile/page.js",
+  "/page": "app/page.js",
+  "/products/page": "app/products/page.js",
+  "/categories/page": "app/categories/page.js",
+  "/categories/[slug]/page": "app/categories/[slug]/page.js"
+}
