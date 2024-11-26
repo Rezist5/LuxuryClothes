@@ -86,7 +86,7 @@ export const fetchUser = async () => {
   try {
     const response = await api.get('/me');
     console.log('Fetched user data:', response.data); // Для отладки
-    return response.data.user; // Убедимся, что возвращаем правильную структуру данных
+    return response.data.user; // Убедимся, что возврщаем правильную структуру данных
   } catch (error) {
     console.error('Error fetching user:', error);
     throw error;
@@ -101,12 +101,11 @@ export const fetchProducts = async (filters?: {
   minPrice?: string;
   maxPrice?: string;
   sort?: string;
+  limit?: string;
 }) => {
   try {
-    // Создаем объект с параметрами запроса
     const params = new URLSearchParams();
     
-    // Добавляем только непустые значения фильтров
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) {
@@ -115,9 +114,7 @@ export const fetchProducts = async (filters?: {
       });
     }
 
-    // Формируем URL с параметрами
     const url = `/products${params.toString() ? `?${params.toString()}` : ''}`;
-    
     const { data } = await api.get(url);
     return data;
   } catch (error) {
@@ -169,8 +166,13 @@ export const deleteProduct = async (id: string) => {
 
 // Search
 export const searchProducts = async (query: string) => {
-  const { data } = await api.get(`/search?q=${encodeURIComponent(query)}`);
-  return data;
+  try {
+    const { data } = await api.get(`/search?q=${encodeURIComponent(query)}`);
+    return data;
+  } catch (error) {
+    console.error('Search error:', error);
+    throw error;
+  }
 };
 
 // Categories
@@ -386,7 +388,7 @@ export const updateProfile = async (data: FormData) => {
     // Преобразуем FormData в объект для отправки
     const formDataObj: Record<string, any> = {};
     data.forEach((value, key) => {
-      // Пропускаем пустые значения
+      // Пропускаем пустые знаения
       if (value !== '' && value !== null && value !== undefined) {
         formDataObj[key] = value;
       }
@@ -424,15 +426,14 @@ export const sendPasswordResetLink = async (email: string) => {
 
 export const resetPassword = async (data: {
   email: string;
-  token: string;
   password: string;
   password_confirmation: string;
 }) => {
   try {
     const response = await api.post('/reset-password', data);
     return response.data;
-  } catch (error) {
-    console.error('Password reset error:', error);
+  } catch (error: any) {
+    console.error('Password reset error:', error.response?.data);
     throw error;
   }
 };

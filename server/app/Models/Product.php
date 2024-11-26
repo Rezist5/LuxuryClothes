@@ -83,6 +83,11 @@ class Product extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function documents()
+    {
+        return $this->hasMany(ProductDocument::class);
+    }
+
     // Методы
     public function markAsSold()
     {

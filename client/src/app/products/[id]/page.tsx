@@ -6,6 +6,17 @@ import { useQuery } from 'react-query'
 import { fetchProduct, addToCart } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { formatPrice } from '@/lib/utils'
+import { Download } from 'lucide-react'
+import useEmblaCarousel from 'embla-carousel-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+
+interface Document {
+  id: string;
+  name: string;
+  file_path: string;
+  type: string;
+  size: string;
+}
 
 interface Product {
   id: string;
@@ -23,6 +34,7 @@ interface Product {
   seller?: {
     name: string;
   };
+  documents: Document[];
 }
 
 const genderLabels = {
@@ -38,16 +50,24 @@ const conditionLabels = {
 }
 
 export default function ProductPage() {
+  const [emblaRef, emblaApi] = useEmblaCarousel()
   const params = useParams()
   const router = useRouter()
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<string>('')
   const [quantity, setQuantity] = useState(1)
 
   const { data: product, isLoading } = useQuery<Product>(
     ['product', params.id],
     () => fetchProduct(params.id as string)
   )
+
+  const scrollPrev = () => {
+    if (emblaApi) emblaApi.scrollPrev()
+  }
+
+  const scrollNext = () => {
+    if (emblaApi) emblaApi.scrollNext()
+  }
 
   const addToCartHandler = async () => {
     try {
@@ -58,6 +78,24 @@ export default function ProductPage() {
       alert('Ошибка при добавлении в корзину')
     }
   }
+
+  const handleDownload = async (documentId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/products/documents/${documentId}/download`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      alert('Ошибка при скачивании документа');
+    }
+  };
 
   if (isLoading) {
     return <div>Loading...</div>
@@ -71,29 +109,51 @@ export default function ProductPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="lg:grid lg:grid-cols-2 lg:gap-x-8">
         {/* Галерея изображений */}
-        <div className="space-y-4">
-          <div className="aspect-w-1 aspect-h-1 w-full">
-            <img
-              src={product.images[0]}
-              alt={product.name}
-              className="w-full h-[500px] object-cover rounded-lg"
-            />
-          </div>
-          {product.images.length > 1 && (
-            <div className="grid grid-cols-4 gap-4">
+        <div className="relative">
+          <div className="overflow-hidden" ref={emblaRef}>
+            <div className="flex">
               {product.images.map((image, index) => (
-                <button
-                  key={index}
-                  className={`relative aspect-square rounded-lg overflow-hidden ${
-                    selectedImage === image ? 'ring-2 ring-black' : ''
-                  }`}
+                <div 
+                  key={index} 
+                  className="flex-[0_0_100%] min-w-0"
                 >
                   <img
                     src={image}
                     alt={`${product.name} ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-[500px] object-cover rounded-lg"
                   />
-                </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Кнопки навигации */}
+          {product.images.length > 1 && (
+            <>
+              <button
+                onClick={scrollPrev}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={scrollNext}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          {/* Индикаторы */}
+          {product.images.length > 1 && (
+            <div className="flex justify-center gap-2 mt-4">
+              {product.images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => emblaApi?.scrollTo(index)}
+                  className="w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-400"
+                />
               ))}
             </div>
           )}
@@ -161,6 +221,41 @@ export default function ProductPage() {
               {product.description}
             </div>
           </div>
+
+          {/* Добавляем секцию с документами после описания */}
+          {product.documents && product.documents.length > 0 && (
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Дополнительная информация
+              </h3>
+              <div className="space-y-3">
+                {product.documents.map((doc) => (
+                  <div 
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-white rounded shadow">
+                        <Download className="w-5 h-5 text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{doc.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {(parseInt(doc.size) / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDownload(doc.id, doc.name)}
+                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none"
+                    >
+                      Скачать
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Информация о продавце */}
           <div className="mt-8 border-t border-gray-200 pt-8">

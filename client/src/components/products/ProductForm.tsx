@@ -3,6 +3,9 @@
 import { useState, useRef } from 'react'
 import { Category } from '@/types/category'
 import ImageUpload from '@/components/common/ImageUpload'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { toast } from 'react-hot-toast'
 
 interface ProductFormProps {
   onSubmit: (formData: FormData) => Promise<void>
@@ -13,6 +16,7 @@ interface ProductFormProps {
 
 export default function ProductForm({ onSubmit, loading, categories, initialData }: ProductFormProps) {
   const [images, setImages] = useState<File[]>([])
+  const [documents, setDocuments] = useState<File[]>([])
   const formRef = useRef<HTMLFormElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,7 +33,29 @@ export default function ProductForm({ onSubmit, loading, categories, initialData
         formData.append('images[]', image)
     })
 
+    // Добавляем документы
+    documents.forEach(doc => {
+      formData.append('documents[]', doc)
+    })
+
     await onSubmit(formData)
+  }
+
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const pdfs = files.filter(file => file.type === 'application/pdf')
+    
+    if (pdfs.length !== files.length) {
+      toast.error('Можно загружать только PDF файлы')
+      return
+    }
+    
+    if (pdfs.some(file => file.size > 10 * 1024 * 1024)) {
+      toast.error('Размер каждого файла не должен превышать 10MB')
+      return
+    }
+    
+    setDocuments(pdfs)
   }
 
   return (
@@ -210,6 +236,33 @@ export default function ProductForm({ onSubmit, loading, categories, initialData
           maxImages={4}
         />
       </div>
+
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-700">
+          Документы (PDF)
+        </label>
+        <Input
+          type="file"
+          accept=".pdf"
+          multiple
+          onChange={handleDocumentChange}
+          className="mt-1"
+        />
+        <p className="mt-1 text-sm text-gray-500">
+          Максимальный размер файла: 10MB
+        </p>
+      </div>
+      
+      {documents.length > 0 && (
+        <div className="mt-2">
+          <h4 className="text-sm font-medium">Выбранные документы:</h4>
+          <ul className="mt-1 text-sm text-gray-500">
+            {documents.map((doc, index) => (
+              <li key={index}>{doc.name} ({(doc.size / 1024 / 1024).toFixed(2)}MB)</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Кнопка отправки */}
       <div className="flex justify-end">

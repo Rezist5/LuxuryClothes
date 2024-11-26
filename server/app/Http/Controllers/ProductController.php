@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductDocument;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -13,7 +14,16 @@ class ProductController extends Controller
             ->where('status', Product::STATUS_ACTIVE)
             ->with('seller:id,name');
 
-        // Фильтры
+        // Добавляем поиск в основной метод
+        if ($request->filled('search')) {
+            $searchQuery = $request->search;
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('name', 'like', "%{$searchQuery}%")
+                  ->orWhere('description', 'like', "%{$searchQuery}%");
+            });
+        }
+
+        // Остальные фильтры
         if ($request->filled('gender')) {
             $query->where('gender', $request->gender);
         }
@@ -50,13 +60,7 @@ class ProductController extends Controller
                 break;
         }
 
-        // Лимит записей, если указан
-        if ($request->filled('limit')) {
-            $query->limit($request->limit);
-        }
-
-        // Пагинация по 12 товаров, если не указан лимит
-        $products = $request->filled('limit') ? $query->get() : $query->paginate(12);
+        $products = $query->paginate(12);
 
         return response()->json($products);
     }
@@ -103,9 +107,10 @@ class ProductController extends Controller
                 'material' => 'nullable|string|max:50',
                 'style' => 'nullable|string|max:50',
                 'gender' => 'nullable|string|in:male,female,unisex',
+                'documents.*' => 'nullable|mimes:pdf|max:10240', // максимум 10MB для PDF
             ]);
 
-            // Загружаем изображения
+            // Загружаем изобржения
             $images = [];
             foreach ($request->file('images') as $image) {
                 // Валидация каждого изображения
@@ -161,7 +166,23 @@ class ProductController extends Controller
 
             Log::info('Product created:', $product->toArray());
 
-            return response()->json($product, 201);
+            // Обрабатываем PDF документы
+            if ($request->hasFile('documents')) {
+                foreach ($request->file('documents') as $document) {
+                    if ($document->isValid() && $document->getClientMimeType() === 'application/pdf') {
+                        $path = $document->store('product-documents', 'public');
+                        
+                        $product->documents()->create([
+                            'name' => $document->getClientOriginalName(),
+                            'file_path' => $path,
+                            'type' => 'pdf',
+                            'size' => $document->getSize()
+                        ]);
+                    }
+                }
+            }
+
+            return response()->json($product->load('documents'), 201);
 
         } catch (ValidationException $e) {
             Log::error('Validation error:', $e->errors());
@@ -175,6 +196,39 @@ class ProductController extends Controller
                 'message' => 'Failed to create product',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function search(Request $request)
+    {
+        $query = $request->get('q', '');
+        
+        $products = Product::query()
+            ->where('name', 'like', "%{$query}%")
+            ->orWhere('description', 'like', "%{$query}%")
+            ->with(['category', 'images'])
+            ->latest()
+            ->paginate(12);
+        
+        return response()->json([
+            'products' => $products
+        ]);
+    }
+
+    // Добавим метод для скачивания документа
+    public function downloadDocument($id)
+    {
+        try {
+            $document = ProductDocument::findOrFail($id);
+            $path = storage_path('app/public/' . $document->file_path);
+
+            if (!file_exists($path)) {
+                return response()->json(['error' => 'File not found'], 404);
+            }
+
+            return response()->download($path, $document->name);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to download document'], 500);
         }
     }
 } 

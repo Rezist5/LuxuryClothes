@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { resetPassword } from '@/lib/api'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { toast } from 'react-hot-toast'
+import { toast, Toaster } from 'react-hot-toast'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -14,29 +14,45 @@ export default function ResetPasswordPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email')
-  const code = searchParams.get('code')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Button clicked!')
     
-    if (!email || !code) {
-      toast.error('Отсутствуют необходимые параметры')
+    if (!email) {
+      console.log('No email found')
+      toast.error('Email обязателен')
+      return
+    }
+
+    if (password.length < 8) {
+      console.log('Password too short')
+      toast.error('Пароль должен содержать минимум 8 символов')
+      return
+    }
+
+    if (password !== passwordConfirmation) {
+      console.log('Passwords don\'t match')
+      toast.error('Пароли не совпадают')
       return
     }
 
     try {
+      console.log('Attempting to reset password...')
       setLoading(true)
       await resetPassword({
         email,
-        code,
         password,
         password_confirmation: passwordConfirmation
       })
       
+      console.log('Password reset successful')
       toast.success('Пароль успешно изменен')
       router.push('/login')
-    } catch (error) {
-      toast.error('Не удалось изменить пароль')
+    } catch (error: any) {
+      console.error('Reset password error:', error)
+      const errorMessage = error.response?.data?.error || 'Не удалось изменить пароль'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -44,6 +60,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="container mx-auto max-w-md py-12">
+      <Toaster position="top-center" />
       <h1 className="text-2xl font-bold mb-6">Сброс пароля</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -64,7 +81,11 @@ export default function ResetPasswordPage() {
             required
           />
         </div>
-        <Button type="submit" disabled={loading} className="w-full">
+        <Button 
+          type="submit" 
+          disabled={loading} 
+          className="w-full bg-primary text-white hover:bg-primary/90"
+        >
           {loading ? 'Сохранение...' : 'Сохранить новый пароль'}
         </Button>
       </form>

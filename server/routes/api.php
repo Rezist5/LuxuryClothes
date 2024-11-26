@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Carbon\Carbon;
 
 // Публичные маршруты
 Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
@@ -66,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/products/{product}/reviews', [ProductController::class, 'addReview']);
     Route::put('/reviews/{review}', [ProductController::class, 'updateReview']);
     Route::delete('/reviews/{review}', [ProductController::class, 'deleteReview']);
+    
+    Route::get('/products/documents/{id}/download', [ProductController::class, 'downloadDocument']);
 });
 
 // Маршруты для сброса пароля
@@ -111,26 +114,23 @@ Route::post('/forgot-password', function (Request $request) {
 Route::post('/reset-password', function (Request $request) {
     $request->validate([
         'email' => 'required|email',
-        'token' => 'required|string',
         'password' => 'required|min:8|confirmed'
     ]);
 
     try {
-        $reset = DB::table('password_resets')
-            ->where('email', $request->email)
-            ->first();
-
-        if (!$reset || !Hash::check($request->token, $reset->token)) {
+        // Находим пользователя
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user) {
             return response()->json([
-                'error' => 'Неверная ссылка для сброса пароля'
-            ], 400);
+                'error' => 'Пользователь не найден'
+            ], 404);
         }
 
-        User::where('email', $request->email)->update([
+        // Обновляем пароль
+        $user->update([
             'password' => Hash::make($request->password)
         ]);
-
-        DB::table('password_resets')->where('email', $request->email)->delete();
 
         return response()->json([
             'message' => 'Пароль успешно изменен'

@@ -36,7 +36,7 @@ class CategoryController extends Controller
         return response()->json($categories);
     }
 
-    public function products(Request $request, $slug)
+   public function products(Request $request, $slug)
     {
         try {
             $category = Category::where('slug', $slug)->firstOrFail();

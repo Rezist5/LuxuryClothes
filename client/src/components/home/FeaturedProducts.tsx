@@ -4,43 +4,56 @@ import { useState, useEffect } from 'react'
 import { useQuery } from 'react-query'
 import { fetchProducts } from '@/lib/api'
 import ProductCard from '@/components/products/ProductCard'
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
-import type { Product } from '@/types/product'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+
+interface Product {
+  id: string
+  name: string
+  price: number
+  images: string[]
+  description: string
+  gender: 'male' | 'female' | 'unisex'
+  condition: 'new' | 'used' | 'good'
+  brand?: string
+  size: string
+  color: string
+}
 
 export default function FeaturedProducts() {
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const itemsPerSlide = 4
+  const [currentPage, setCurrentPage] = useState(0)
+  const productsPerPage = 4
 
-  const { data: products, isLoading } = useQuery<Product[]>(
+  const { data, error, isLoading } = useQuery(
     'featuredProducts',
-    () => fetchProducts({ sort: 'popular', limit: 12 })
+    () => fetchProducts({ sort: 'popular', limit: '12' })
   )
 
-  const totalSlides = products ? Math.ceil(products.length / itemsPerSlide) : 0
+  const products = data?.data || []
+  const totalPages = Math.ceil(products.length / productsPerPage)
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % totalSlides)
+  const nextPage = () => {
+    setCurrentPage((prev) => (prev + 1) % totalPages)
   }
 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides)
+  const prevPage = () => {
+    setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages)
   }
 
   // Автоматическая прокрутка каждые 5 секунд
   useEffect(() => {
-    if (totalSlides <= 1) return
+    if (totalPages <= 1) return
 
-    const timer = setInterval(nextSlide, 5000)
+    const timer = setInterval(nextPage, 5000)
     return () => clearInterval(timer)
-  }, [totalSlides])
+  }, [totalPages])
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="animate-pulse">
-              <div className="bg-gray-200 h-64 rounded-lg"></div>
+              <div className="bg-gray-200 aspect-square rounded-lg"></div>
               <div className="mt-4 space-y-2">
                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                 <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -48,63 +61,65 @@ export default function FeaturedProducts() {
             </div>
           ))}
         </div>
-      </div>
+      </section>
     )
   }
 
-  if (!products?.length) {
+  if (error || !products.length) {
     return null
   }
 
   const currentProducts = products.slice(
-    currentSlide * itemsPerSlide,
-    (currentSlide + 1) * itemsPerSlide
+    currentPage * productsPerPage,
+    (currentPage + 1) * productsPerPage
   )
 
   return (
-    <section className="py-12 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-8">Featured Items</h2>
-        
-        <div className="relative">
-          {totalSlides > 1 && (
-            <>
-              <button
-                onClick={prevSlide}
-                className="absolute -left-4 top-1/2 transform -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
-              >
-                <ChevronLeftIcon className="h-6 w-6" />
-              </button>
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Featured Items</h2>
+        <a href="/products" className="text-gray-600 hover:text-gray-900">
+          View all →
+        </a>
+      </div>
 
-              <button
-                onClick={nextSlide}
-                className="absolute -right-4 top-1/2 transform -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
-              >
-                <ChevronRightIcon className="h-6 w-6" />
-              </button>
-            </>
-          )}
+      <div className="relative">
+        {totalPages > 1 && (
+          <>
+            <button
+              onClick={prevPage}
+              className="absolute -left-4 top-1/2 transform -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <button
+              onClick={nextPage}
+              className="absolute -right-4 top-1/2 transform -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mx-8">
-            {currentProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mx-8">
+          {currentProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-4 space-x-2">
+            {[...Array(totalPages)].map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPage(index)}
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  currentPage === index ? 'bg-black' : 'bg-gray-300'
+                }`}
+              />
             ))}
           </div>
-
-          {totalSlides > 1 && (
-            <div className="flex justify-center mt-4 space-x-2">
-              {[...Array(totalSlides)].map((_, index) => (
-                <button
-                  key={index}
-                  className={`h-2 w-2 rounded-full transition-colors ${
-                    currentSlide === index ? 'bg-black' : 'bg-gray-300'
-                  }`}
-                  onClick={() => setCurrentSlide(index)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </section>
   )
